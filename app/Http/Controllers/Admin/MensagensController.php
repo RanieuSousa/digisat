@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Clientes;
+use App\Models\Instancia;
 use App\Models\Mensagens;
 use http\Client;
 use Illuminate\Support\Facades\Log;
@@ -40,7 +41,7 @@ class MensagensController extends Controller
 
     public function messagememMassa()
     {
-        
+
         // BUSQUE APENAS OS DADOS NECESSÁRIOS PARA OS FILTROS
         $lojas = Clientes::whereNotNull('loja')->distinct()->pluck('loja')->sort();
         $vendedores = Clientes::whereNotNull('vendedor')->distinct()->pluck('vendedor')->sort();
@@ -68,8 +69,9 @@ class MensagensController extends Controller
             ->when($request->filled('profissao'), fn($query) => $query->where('profissao', $request->profissao))
             ->when($request->filled('cidade'), fn($query) => $query->where('cidade', $request->cidade))
             ->when($request->filled('estado'), fn($query) => $query->where('estado', $request->estado))
-                   
+            ->limit(1)
             ->get();
+
 
         $mensagemOriginal = $request->input('mensagem');
         $anexos = $request->file('anexos');
@@ -123,21 +125,14 @@ class MensagensController extends Controller
             // Garantir que o número comece com 55
             $number = preg_replace('/^\+?0?/', '', $number); // remove + ou 0 no início
             $number = '55' . $number;
-    
-            Log::info('Enviando mensagem mídia para Evolution API', [
-                'number' => $number,
-                'fileUrl' => $fileUrl,
-                'fileName' => $fileName,
-                'caption' => $caption,
-                'mediaType' => $mediaType,
-                'mimeType' => $mimeType,
-            ]);
-    
+      $instancia = Instancia::find(6);
+
+
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'apikey' => '95596EA594FF-4B7F-BAF9-6A8CB1CE039E',
-            ])->post('http://192.168.1.9:8080/message/sendMedia/digisat', [
-                'number' =>$number,
+                'apikey' => $instancia->hash,
+            ])->post($instancia->url.'/message/sendMedia/'.$instancia->instanceName, [
+                'number' =>"5563981050421",
                 'delay' => 10000,
                 'mediatype' => $mediaType,
                 'mimetype' => $mimeType,
@@ -145,11 +140,11 @@ class MensagensController extends Controller
                 'media' => $fileUrl,
                 'fileName' => $fileName,
             ]);
-    
+
             Log::info('Resposta da Evolution API', ['response' => $response->body()]);
-    
+
             return $response->json();
-    
+
         } catch (\Exception $e) {
             Log::error('Erro ao enviar mensagem mídia', [
                 'message' => $e->getMessage(),
@@ -159,7 +154,7 @@ class MensagensController extends Controller
             throw $e;
         }
     }
-    
+
 
 
     private function tratarMensagemComVariaveis($mensagem, $cliente, $dadosExtras = [])
