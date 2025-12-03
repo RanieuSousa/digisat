@@ -122,38 +122,73 @@ class MensagensController extends Controller
     public function sendMediaMessage($number, $fileUrl, $fileName, $caption, $mediaType, $mimeType)
     {
         try {
-            // Garantir que o número comece com 55
-            $number = preg_replace('/^\+?0?/', '', $number); // remove + ou 0 no início
+
+            // Normaliza número
+            $originalNumber = $number;
+            $number = preg_replace('/^\+?0?/', '', $number);
             $number = '55' . $number;
-      $instancia = Instancia::find(6);
 
+            $instancia = Instancia::find(6);
 
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'apikey' => $instancia->hash,
-            ])->post($instancia->url.'/message/sendMedia/'.$instancia->instanceName, [
-                'number' =>"5563981050421",
-                'delay' => 10000,
+            // Monta URL final
+            $url = $instancia->url . '/message/sendMedia/' . $instancia->instanceName;
+
+            // Monta payload final enviado
+            $payload = [
+                'number'    => $number,
+                'delay'     => 10000,
                 'mediatype' => $mediaType,
-                'mimetype' => $mimeType,
-                'caption' => $caption,
-                'media' => $fileUrl,
-                'fileName' => $fileName,
+                'mimetype'  => $mimeType,
+                'caption'   => $caption,
+                'media'     => $fileUrl,
+                'fileName'  => $fileName,
+            ];
+
+            // LOGS ANTES DO ENVIO
+            Log::info('🚀 Enviando mídia para Evolution API', [
+                'url'      => $url,
+                'headers'  => [
+                    'Content-Type' => 'application/json',
+                    'apikey'       => $instancia->hash,
+                ],
+                'payload'  => $payload,
+                'original_number' => $originalNumber,
+                'normalized_number' => $number,
             ]);
 
-            Log::info('Resposta da Evolution API', ['response' => $response->body()]);
+            // Envio da requisição
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'apikey'       => $instancia->hash,
+            ])->post($url, $payload);
+
+            // LOGS COMPLETOS DA RESPOSTA
+            Log::info('📥 Resposta da Evolution API', [
+                'status'   => $response->status(),
+                'body'     => $response->body(),
+                'headers'  => $response->headers(),
+                'successful' => $response->successful(),
+                'failed'     => $response->failed(),
+                'json'     => $response->json(),
+            ]);
 
             return $response->json();
 
         } catch (\Exception $e) {
-            Log::error('Erro ao enviar mensagem mídia', [
-                'message' => $e->getMessage(),
-                'number' => $number,
-                'fileUrl' => $fileUrl,
+
+            // LOG EM CASO DE ERRO NA REQUISIÇÃO
+            Log::error('❌ Erro ao enviar mídia para Evolution API', [
+                'error_message' => $e->getMessage(),
+                'number'        => $number ?? null,
+                'payload'       => $payload ?? null,
+                'url'           => $url ?? null,
+                'trace'         => $e->getTraceAsString(),
             ]);
+
             throw $e;
         }
     }
+
 
 
 
